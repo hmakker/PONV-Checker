@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>PONV Case Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two-pane clinical worksheet. Case inputs on the left, a sticky verdict panel on the right; stacks verdict-first on phones. */
+:root{
+  --bg:#f3f6f6; --surface:#ffffff; --ink:#132326; --muted:#566a6d; --line:#d3dddd;
+  --accent:#0a6c70; --accent-soft:#e1efef;
+  --good:#1b7442; --warn:#9a5c00; --bad:#b0281f; --na:#5f6f72;
+  --font-ui:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1617; --surface:#162123; --ink:#e2ecec; --muted:#93a6a8; --line:#2a3b3d;
+  --accent:#52c3c5; --accent-soft:#183436;
+  --good:#5ccb8b; --warn:#e6a74c; --bad:#f2867c; --na:#93a6a8; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1617; --surface:#162123; --ink:#e2ecec; --muted:#93a6a8; --line:#2a3b3d;
+  --accent:#52c3c5; --accent-soft:#183436;
+  --good:#5ccb8b; --warn:#e6a74c; --bad:#f2867c; --na:#93a6a8; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-ui);font-size:15px;line-height:1.45}
+.wrap{max-width:820px;margin:0 auto;padding-inline:16px;padding-block:24px 48px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+h1{font-size:1.6rem;font-weight:800;letter-spacing:-.01em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:62ch}
+.privacy{font-size:.82rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.privacy::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--good)}
+.banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;background:var(--accent-soft);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:.92rem}
+.banner[hidden]{display:none}
+.grid{display:block}
+.form{display:flex;flex-direction:column;gap:16px;min-width:0}
+fieldset{border:1px solid var(--line);background:var(--surface);border-radius:10px;margin:0;padding:16px 18px 18px;min-width:0}
+legend{font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);padding:0 6px}
+.row{display:flex;flex-wrap:wrap;gap:14px 20px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>span,.lbl{font-size:.8rem;font-weight:600;color:var(--muted)}
+input[type=number],input[type=text],select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0}
+input[type=number]{width:96px;font-family:var(--font-mono)}
+input[type=text]{font-family:var(--font-mono);width:100%}
+select{max-width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,label.opt:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+label.opt{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:7px 11px;cursor:pointer;background:var(--bg);user-select:none}
+label.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+label.opt input{accent-color:var(--accent);margin:0}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.checks label.opt{align-items:flex-start}
+.checks label.opt input{margin-top:3px}
+.auto{display:flex;align-items:center;gap:8px;border:1px dashed var(--line);border-radius:6px;padding:7px 11px;color:var(--muted)}
+.auto.on{color:var(--ink);border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+.auto b{font-family:var(--font-mono);font-size:.8rem;font-weight:500}
+.hint{font-size:.82rem;color:var(--muted);margin:10px 0 0}
+.hint code,.mono{font-family:var(--font-mono);font-size:.82em}
+.cls{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.clsbox{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);align-items:center;gap:10px;padding:8px 10px 8px 12px;border-top:1px solid var(--line);min-width:0}
+.clsbox:first-child{border-top:0}
+.clsbox.used{background:var(--accent-soft)}
+.clsbox .cn{font-size:.9rem;font-weight:600;display:flex;flex-direction:column;min-width:0}
+.clsbox .cn small{font-weight:500;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
+.clsbox select{width:100%;min-height:40px;font-size:16px}
+.clsbox.used select{border-color:var(--accent);font-weight:600}
+.clscount{font-size:.82rem;color:var(--muted);margin:10px 0 0}
+.subhead{font-size:.86rem;font-weight:700;margin:16px 0 8px}
+[data-show]{display:contents}
+
+.verdicts{display:flex;flex-direction:column;gap:10px;min-width:0;margin-bottom:16px}
+.verdicts .card{border-color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.card .top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.mid{font-family:var(--font-mono);font-weight:500;font-size:.95rem}
+.mname{font-size:.78rem;color:var(--muted)}
+.pill{font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 10px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
+.s-good{color:var(--good)}.s-bad{color:var(--bad)}.s-warn{color:var(--warn)}.s-na{color:var(--na)}
+.card .body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.headline{font-weight:700;font-size:1.05rem;margin:0;text-wrap:balance}
+.meter{display:flex;gap:5px}
+.meter i{flex:1;height:8px;border-radius:3px;background:var(--line)}
+.meter i.f{background:var(--good)}
+.meter i.m{background:transparent;border:1.5px dashed var(--bad)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.88rem;margin:0}
+.kv dt{color:var(--muted)}.kv dd{margin:0;font-variant-numeric:tabular-nums}
+.todo{margin:0;padding-left:18px;font-size:.9rem;display:flex;flex-direction:column;gap:4px}
+.small{font-size:.8rem;color:var(--muted);margin:0}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button{font:inherit;font-weight:600;font-size:.88rem;border-radius:6px;padding:8px 14px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:var(--surface)}
+button.ghost{background:transparent;color:var(--accent)}
+details{border-top:1px solid var(--line);padding-top:14px}
+details summary{cursor:pointer;font-weight:600;font-size:.9rem}
+.ref{font-size:.85rem;color:var(--muted);max-width:75ch}
+.ref li{margin-bottom:4px}
+footer{margin-top:28px;font-size:.8rem;color:var(--muted);max-width:80ch}
+@media (prefers-reduced-motion:no-preference){.pill,.clsbox,label.opt{transition:background .15s,border-color .15s,color .15s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>PONV Case Checker</h1>
+      <p class="sub">Checks one case against the ASPIRE PONV prophylaxis measure and tells you what is still needed.</p>
+    </div>
+    <div class="privacy">Nothing you enter is saved or sent anywhere</div>
+  </header>
+
+
+  <div class="grid">
+    <form class="form" id="f" autocomplete="off" onsubmit="return false">
+      <fieldset>
+        <legend>Case</legend>
+        <div class="verdicts" aria-live="polite">
+          <section class="card" id="v05"></section>
+          <div class="actions"><button type="button" class="ghost" id="clear2">Clear case</button></div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex-basis:100%">
+            <span>Anesthetic</span>
+            <div class="seg">
+              <label class="opt"><input type="radio" name="type" id="t_ga" value="ga">GETA</label>
+              <label class="opt"><input type="radio" name="type" id="t_no" value="none">MAC</label>
+            </div>
+          </div>
+          <div class="field" id="durWrap" style="justify-content:flex-end"><label class="opt"><input type="checkbox" id="dur">Surgery 30 minutes or less</label></div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <label class="field" style="flex:1 1 280px"><span>Excluded procedure</span>
+            <select id="proc">
+              <option value="std">None</option>
+              <option value="asa56">ASA 5 or 6</option>
+              <option value="bronch">Bronchoscopy only</option>
+              <option value="img">Diagnostic imaging only</option>
+              <option value="ect">Electroconvulsive therapy</option>
+              <option value="endo">Endoscopy or ERCP only</option>
+              <option value="intub">Intubation only</option>
+              <option value="tee">TEE or cardioversion</option>
+              <option value="labor">Labor epidural (non-operative OB)</option>
+              <option value="organ">Organ procurement</option>
+            </select>
+          </label>
+          <div class="field" style="justify-content:flex-end">
+            <label class="opt"><input type="checkbox" id="icu">Going directly to ICU</label>
+          </div>
+          <div class="field" id="u18Wrap" style="justify-content:flex-end">
+            <label class="opt"><input type="checkbox" id="u18">Patient under 18</label>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset id="rfSet">
+        <legend>PONV risk factors</legend>
+        <p class="hint" id="rfCsNote" style="margin:0 0 12px" hidden>Risk factors are not considered for cesarean delivery. Every cesarean needs two classes.</p>
+        <div class="checks">
+          <label class="opt"><input type="checkbox" id="rf_age">Age under 50</label>
+          <label class="opt" id="sexWrap"><input type="checkbox" id="rf_fem">Female</label>
+          <label class="opt"><input type="checkbox" id="rf_proc">Cholecystectomy, laparoscopic or gynecologic procedure</label>
+          <label class="opt"><input type="checkbox" id="rf_hx">History of PONV or motion sickness (counts once)</label>
+          <label class="opt"><input type="checkbox" id="rf_op">Opioids for postop pain (long-acting intraop or PACU)</label>
+          <label class="opt"><input type="checkbox" id="rf_vol">Inhalational anesthetic for more than 1 hour</label>
+          <label class="opt"><input type="checkbox" id="rf_smk">Non-smoker (or smoking status not documented)</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Prophylaxis given</legend>
+        <p class="hint" style="margin:0 0 12px">Count only agents given from 4 hours before preop start to PACU start. Routes that count: IV, IM, oral, sublingual, rectal, intraosseous, enteric tube; scopolamine also topical or transdermal.</p>
+        <div class="cls" id="drugs"></div>
+        <p class="clscount" id="clsCount"></p>
+      </fieldset>
+
+    </form>
+
+  </div>
+
+  <details style="margin-top:24px">
+    <summary>Rules this checker applies</summary>
+    <div class="ref">
+      <p>Included: age 18 or older under general anesthesia with at least one risk factor, or any cesarean delivery regardless of age or technique. Excluded: under 18 (except cesarean), ASA 5 or 6, organ procurement, direct ICU transfer, bronchoscopy only, diagnostic imaging only, ECT, endoscopy or ERCP only, intubation only, labor epidural, TEE or cardioversion, and surgery of 30 minutes or less (not applied to cesarean).</p>
+      <ul>
+        <li>1 to 2 risk factors: at least 2 antiemetics from different classes.</li>
+        <li>3 or more risk factors: at least 3 antiemetics from different classes.</li>
+        <li>Cesarean: at least 2 from different classes. Recommended classes are 5-HT3 antagonists, glucocorticoids and antidopaminergics.</li>
+        <li>Propofol infusion counts as one option. A 2025 committee review voted to add midazolam; this checker does not count it until your MPOG build does.</li>
+      </ul>
+      <p>Class assignment of individual drugs follows the class names in the specifications. Droperidol, haloperidol, metoclopramide and amisulpride are grouped together as antidopaminergics, which is the conservative reading; confirm against your local MPOG build if it splits them.</p>
+    </div>
+  </details>
+
+  <footer>Based on the ASPIRE PONV-05 (published 01/2022, revised 09/2024) specification. This is a bedside aid, not the MPOG abstraction itself, and it does not give dosing advice.</footer>
+</div>
+
+<script>
+const CLASSES=[
+  {k:"5ht3",label:"5-HT3 antagonist",cs:true,drugs:["Ondansetron","Granisetron","Dolasetron","Palonosetron"]},
+  {k:"gc",label:"Glucocorticoid",cs:true,drugs:["Dexamethasone","Methylprednisolone"]},
+  {k:"da",label:"Antidopaminergic",cs:true,drugs:["Droperidol","Haloperidol","Metoclopramide","Amisulpride"]},
+  {k:"nk1",label:"NK-1 antagonist",drugs:["Aprepitant","Fosaprepitant","Rolapitant"]},
+  {k:"pheno",label:"Phenothiazine",drugs:["Promethazine","Prochlorperazine"]},
+  {k:"ah",label:"Antihistamine",drugs:["Diphenhydramine","Dimenhydrinate"]},
+  {k:"ach",label:"Anticholinergic",drugs:["Scopolamine (transdermal)"]},
+  {k:"prop",label:"Propofol infusion",drugs:["Propofol infusion / TIVA"]}
+];
+const PROC={
+  std:{},asa56:{x05:"ASA 5 or 6"},bronch:{x05:"Bronchoscopy only"},img:{x05:"Diagnostic imaging only"},ect:{x05:"Electroconvulsive therapy"},
+  endo:{x05:"Endoscopy or ERCP only"},intub:{x05:"Intubation only"},tee:{x05:"TEE or cardioversion"},
+  labor:{x05:"Labor epidural",x03:"Labor epidural"},organ:{x05:"Organ procurement",x03:"Organ procurement"},
+  liver:{x03:"Liver transplant"},lung:{x03:"Lung transplant"},radonc:{x03:"Radiation oncology location"}
+};
+const $=id=>document.getElementById(id);
+const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,"_");
+
+$("drugs").innerHTML=CLASSES.map(c=>`<label class="clsbox" data-cls="${c.k}"><span class="cn">${c.label}${c.cs?'<small class="csrec">C-section recommended</small>':''}</span><select id="d_${c.k}" data-cls="${c.k}"><option value="">Not given</option>${c.drugs.map(d=>`<option>${d}</option>`).join("")}</select></label>`).join("");
+
+function read(){
+  const type=(document.querySelector('input[name=type]:checked')||{}).value||"ga";
+  const num=id=>{const v=$(id).value.trim();return v===""?null:Number(v)};
+  const sel=[...document.querySelectorAll('#drugs select')].filter(x=>x.value);
+  const cls=new Set(sel.map(x=>x.dataset.cls));
+  const drugs=sel.map(x=>x.value);
+  return {type,u50:$("rf_age").checked,fem:$("rf_fem").checked,u18:$("u18").checked,dur:$("dur").checked,proc:$("proc").value,
+    icu:$("icu").checked,conv:false,proc5:$("rf_proc").checked,hx:$("rf_hx").checked,op:$("rf_op").checked,
+    vol:$("rf_vol").checked,smk:$("rf_smk").checked,cls,drugs};
+}
+
+function risk(s){
+  const list=[];
+  if(s.u50||s.u18)list.push("Age under 50");
+  if(s.fem)list.push("Female");
+  if(s.hx)list.push("PONV or motion sickness history");
+  if(s.smk)list.push("Non-smoker");
+  if(s.op)list.push("Postop opioids");
+  if(s.vol)list.push("Inhalational anesthetic over 1 hour");
+  if(s.proc5)list.push("Cholecystectomy, laparoscopic or gyn procedure");
+  return list;
+}
+
+function eval05(s){
+  const cs=s.type==="cs";
+  if(s.type==="none")return {st:"na",pill:"Not included",head:"MAC cases are not part of the PONV prophylaxis measure.",notes:[]};
+  const ex=[];
+  if(!cs&&s.u18)ex.push("Under 18 (non-cesarean)");
+  if(s.icu)ex.push("Direct ICU transfer");
+  if(PROC[s.proc].x05)ex.push(PROC[s.proc].x05);
+  if(!cs&&s.dur)ex.push("Surgery 30 minutes or less");
+  if(ex.length)return {st:"na",pill:"Excluded",head:"This case is excluded from the PONV prophylaxis measure.",notes:ex};
+  const rf=cs?null:risk(s);
+  const pending=[];
+  if(!cs&&rf.length===0&&!pending.length)return {st:"na",pill:"Not included",head:"No risk factors ticked. A GETA case with none is outside the PONV prophylaxis measure.",notes:[],rf};
+  const need=cs?2:(rf.length>=3?3:2);
+  const have=s.cls.size, short=Math.max(0,need-have);
+  const unused=CLASSES.filter(c=>!s.cls.has(c.k)).sort((a,b)=>cs?(b.cs?1:0)-(a.cs?1:0):0);
+  const todo=[...pending];
+  if(short)todo.push(`Give ${short} more antiemetic${short>1?"s":""} from ${short>1?"different classes":"a class not yet used"}: ${unused.slice(0,4).map(c=>c.label).join(", ")}.`);
+  const notes=[];
+  if(cs){const off=[...s.cls].filter(k=>!CLASSES.find(c=>c.k===k).cs);if(off.length)notes.push("For cesarean the spec recommends 5-HT3, glucocorticoid and antidopaminergic agents. Check that your site credits the other classes you used.");}
+  if(s.conv)notes.push("Converted cesarean: the window starts 4 hours before delivery start.");
+  const met=short===0;
+  return {st:met&&!pending.length?"good":(met?"warn":"bad"),pill:met?(pending.length?"Check inputs":"Met"):"Not met",
+    head:met?(pending.length?"Prophylaxis count is enough, but some inputs are missing.":`${have} class${have>1?"es":""} given; ${need} required.`):`${have} of ${need} required classes given.`,
+    need,have,rf,todo,notes,cs};
+}
+
+
+function card(id,name,r,inner){
+  $(id).innerHTML=`<div class="top"><div class="mid" style="font-family:var(--font-ui);font-weight:700">PONV Prophylaxis</div><span class="pill s-${r.st}">${r.pill}</span></div><div class="body"><p class="headline">${r.head}</p>${inner}</div>`;
+}
+const ul=(a,cls="todo")=>a&&a.length?`<ul class="${cls}">${a.map(x=>`<li>${x}</li>`).join("")}</ul>`:"";
+
+function render(){
+  const s=read();
+  $("durWrap").hidden=s.type==="cs";
+  $("sexWrap").hidden=s.type==="cs";
+  $("u18Wrap").hidden=s.type==="cs";
+  document.querySelectorAll(".csrec").forEach(e=>e.hidden=s.type!=="cs");
+  $("rfCsNote").hidden=s.type!=="cs";
+  document.querySelectorAll("#rfSet .checks, #rfSet .row").forEach(e=>e.style.opacity=s.type==="cs"?.45:1);
+  document.querySelectorAll("#drugs .clsbox").forEach(b=>b.classList.toggle("used",s.cls.has(b.dataset.cls)));
+  $("clsCount").textContent=`${s.cls.size} class${s.cls.size===1?"":"es"} selected. Pick one agent per class; a second agent from the same class does not add to the count.`;
+
+  const a=eval05(s);
+  let in05="";
+  if(a.need){
+    in05+=`<div class="meter" aria-hidden="true">${Array.from({length:Math.max(a.need,a.have)},(_,i)=>`<i class="${i<a.have?"f":(i<a.need?"m":"")}"></i>`).join("")}</div>`;
+    in05+=`<dl class="kv"><dt>Pathway</dt><dd>${a.cs?"C Section":"GETA, adult"}</dd>`;
+    if(a.rf)in05+=`<dt>Risk factors</dt><dd>${a.rf.length}</dd>`;
+    in05+=`<dt>Classes needed</dt><dd>${a.need}</dd><dt>Classes given</dt><dd>${a.have}</dd></dl>`;
+    if(a.rf&&a.rf.length)in05+=`<p class="small">${a.rf.join(" · ")}</p>`;
+  }
+  in05+=ul(a.todo)+ul(a.notes,"todo small");
+  card("v05","Prophylaxis",a,in05);
+
+}
+
+function clearForm(){
+  $("f").reset();$("t_ga").checked=true;render();
+}
+$("clear2").addEventListener("click",clearForm);
+$("f").addEventListener("input",()=>{render()});
+$("f").addEventListener("change",render);
+
+$("t_ga").checked=true;
+render();
+</script>
+</body>
+</html>
