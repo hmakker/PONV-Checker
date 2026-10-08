@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: two-pane clinical worksheet. Case inputs on the left, a sticky verdict panel on the right; stacks verdict-first on phones. */
+/* Layout: single-column clinical worksheet. Case, risk factors and prophylaxis inputs, then the verdict at the bottom. */
 :root{
   --bg:#f3f6f6; --surface:#ffffff; --ink:#132326; --muted:#566a6d; --line:#d3dddd;
   --accent:#0a6c70; --accent-soft:#e1efef;
@@ -71,7 +71,7 @@ label.opt input{accent-color:var(--accent);margin:0}
 .subhead{font-size:.86rem;font-weight:700;margin:16px 0 8px}
 [data-show]{display:contents}
 
-.verdicts{display:flex;flex-direction:column;gap:10px;min-width:0;margin-bottom:16px}
+.verdicts{display:flex;flex-direction:column;gap:10px;min-width:0}
 .verdicts .card{border-color:var(--accent)}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .card .top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
@@ -116,10 +116,6 @@ footer{margin-top:28px;font-size:.8rem;color:var(--muted);max-width:80ch}
     <form class="form" id="f" autocomplete="off" onsubmit="return false">
       <fieldset>
         <legend>Case</legend>
-        <div class="verdicts" aria-live="polite">
-          <section class="card" id="v05"></section>
-          <div class="actions"><button type="button" class="ghost" id="clear2">Clear case</button></div>
-        </div>
         <div class="row">
           <div class="field" style="flex-basis:100%">
             <span>Anesthetic</span>
@@ -175,6 +171,10 @@ footer{margin-top:28px;font-size:.8rem;color:var(--muted);max-width:80ch}
         <p class="clscount" id="clsCount"></p>
       </fieldset>
 
+      <div class="verdicts" aria-live="polite">
+        <section class="card" id="v05"></section>
+        <div class="actions"><button type="button" class="ghost" id="clear2">Clear case</button></div>
+      </div>
     </form>
 
   </div>
